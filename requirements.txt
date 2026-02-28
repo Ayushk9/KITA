@@ -8,3 +8,4 @@ python-dotenv
 openai
 scikit-learn
 nltk
+pyperclip

@@ -1,0 +1,22 @@
+# Secrets - never commit credentials
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+
+# Database
+*.db
+kita_users.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
