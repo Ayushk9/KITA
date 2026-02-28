@@ -1,0 +1,10 @@
+pandas
+numpy
+streamlit
+matplotlib
+plotly
+textblob
+python-dotenv
+openai
+scikit-learn
+nltk
