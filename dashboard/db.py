@@ -1,34 +1,20 @@
 """
-SQLite database module for KITA user authentication.
+Supabase database module for KITA user authentication.
+Replaces SQLite with persistent Supabase backend.
 """
 
 import hashlib
-import sqlite3
-from pathlib import Path
+import streamlit as st
+from supabase import create_client
+from postgrest.exceptions import APIError
 
 
-DB_PATH = Path(__file__).parent.parent / "kita_users.db"
-
-
-def _get_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def _init_db():
-    conn = _get_connection()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT NOT NULL,
-            phone TEXT,
-            password_hash TEXT NOT NULL
-        )
-    """)
-    conn.commit()
-    conn.close()
+# Initialize Supabase client from Streamlit secrets
+def _get_supabase_client():
+    return create_client(
+        st.secrets["supabase"]["url"],
+        st.secrets["supabase"]["anon_key"],
+    )
 
 
 def _hash_password(password: str) -> str:
@@ -37,33 +23,71 @@ def _hash_password(password: str) -> str:
 
 def create_user(username: str, email: str, password: str, phone: str = "") -> bool:
     """
-    Create a new user. Returns True on success, False if username exists.
+    Create a new user.
+    Returns True on success, False if username exists or error occurs.
     """
-    _init_db()
     try:
-        conn = _get_connection()
-        conn.execute(
-            "INSERT INTO users (username, email, phone, password_hash) VALUES (?, ?, ?, ?)",
-            (username.strip().lower(), email.strip(), phone.strip(), _hash_password(password)),
+        supabase = _get_supabase_client()
+        username_clean = username.strip().lower()
+
+        # Check if username already exists
+        existing = (
+            supabase.table("users")
+            .select("username")
+            .eq("username", username_clean)
+            .execute()
         )
-        conn.commit()
-        conn.close()
-        return True
-    except sqlite3.IntegrityError:
+
+        if existing.data:
+            return False
+
+        # Insert new user
+        response = (
+            supabase.table("users")
+            .insert(
+                {
+                    "username": username_clean,
+                    "email": email.strip(),
+                    "phone": phone.strip(),
+                    "password_hash": _hash_password(password),
+                }
+            )
+            .execute()
+        )
+
+        return bool(response.data)
+
+    except (KeyError, APIError, Exception):
         return False
 
 
 def authenticate_user(username: str, password: str) -> dict | None:
     """
-    Authenticate user. Returns user dict {username, email, phone} or None.
+    Authenticate user.
+    Returns user dict {username, email, phone} or None.
     """
-    _init_db()
-    conn = _get_connection()
-    row = conn.execute(
-        "SELECT username, email, phone FROM users WHERE username = ? AND password_hash = ?",
-        (username.strip().lower(), _hash_password(password)),
-    ).fetchone()
-    conn.close()
-    if row:
-        return {"username": row["username"], "email": row["email"], "phone": row["phone"]}
-    return None
+    try:
+        supabase = _get_supabase_client()
+        username_clean = username.strip().lower()
+        password_hash = _hash_password(password)
+
+        response = (
+            supabase.table("users")
+            .select("username, email, phone")
+            .eq("username", username_clean)
+            .eq("password_hash", password_hash)
+            .execute()
+        )
+
+        if response.data:
+            user = response.data[0]
+            return {
+                "username": user.get("username"),
+                "email": user.get("email"),
+                "phone": user.get("phone"),
+            }
+
+        return None
+
+    except (KeyError, APIError, Exception):
+        return None
