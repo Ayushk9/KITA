@@ -32,7 +32,7 @@ def create_user(username: str, email: str, password: str, phone: str = "") -> bo
 
         # Check if username already exists
         existing = (
-            supabase.table("users")
+            supabase.table("Users")
             .select("username")
             .eq("username", username_clean)
             .execute()
@@ -43,7 +43,7 @@ def create_user(username: str, email: str, password: str, phone: str = "") -> bo
 
         # Insert new user
         response = (
-            supabase.table("users")
+            supabase.table("Users")
             .insert(
                 {
                     "username": username_clean,
@@ -72,7 +72,7 @@ def authenticate_user(username: str, password: str) -> dict | None:
         password_hash = _hash_password(password)
 
         response = (
-            supabase.table("users")
+            supabase.table("Users")
             .select("username, email, phone")
             .eq("username", username_clean)
             .eq("password_hash", password_hash)
